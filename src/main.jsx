@@ -76,8 +76,9 @@ function CustomerView({ state, myNumber, onTakeNumber }) {
   const current  = Number(state.current);
   const mine     = Number(myNumber);
   const waiting  = mine > 0 ? Math.max(0, mine - current - 1) : null;
-  const isMyTurn = mine > 0 && current >= mine;
+  const isMyTurn = mine > 0 && current === mine;
   const isNext   = mine > 0 && waiting === 0 && !isMyTurn;
+  const isDone   = mine > 0 && current > mine;
 
   return (
     <div style={{
@@ -139,6 +140,21 @@ function CustomerView({ state, myNumber, onTakeNumber }) {
         >
           🐾 立即取號
         </button>
+      ) : isDone ? (
+        <div style={{
+          background:"#fff", borderRadius:24, padding:"32px 40px",
+          textAlign:"center", zIndex:1,
+          border:"2px solid #f0d9bc",
+          boxShadow:"0 4px 24px rgba(0,0,0,0.10)",
+        }}>
+          <div style={{ fontSize:48, marginBottom:12 }}>🐾</div>
+          <p style={{ margin:"0 0 8px", fontSize:20, fontWeight:700, color:"#5a3a1a" }}>
+            感謝您今天的參與！
+          </p>
+          <p style={{ margin:0, fontSize:13, color:"#a07850" }}>
+            祝毛孩健康平安 💛
+          </p>
+        </div>
       ) : (
         <div style={{
           background: isMyTurn ? "#2e7d32" : isNext ? "#e65100" : "#fff",
