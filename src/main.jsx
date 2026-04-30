@@ -267,7 +267,9 @@ function VetView({ state, onNext, onReset, onToggle, saving }) {
 
 // ── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [isVet,    setIsVet]    = useState(false);
+  const [isVet,    setIsVet]    = useState(
+    new URLSearchParams(window.location.search).get("mode") === "vet"
+  );
   const [state,    setState]    = useState(defaultState);
   const [myNumber, setMyNumber] = useState(null);
   const [saving,   setSaving]   = useState(false);
@@ -318,21 +320,6 @@ export default function App() {
     await saveState(next);
   };
 
-  const ToggleBtn = () => (
-    <button
-      onClick={() => setIsVet(v => !v)}
-      style={{
-        position:"fixed", bottom:20, right:20, zIndex:999,
-        background:"rgba(0,0,0,0.55)", color:"#fff",
-        border:"none", borderRadius:24, padding:"10px 18px",
-        fontSize:12, cursor:"pointer", backdropFilter:"blur(6px)",
-        letterSpacing:0.5,
-      }}
-    >
-      {isVet ? "👤 切換客人端" : "🩺 切換獸醫端"}
-    </button>
-  );
-
   if (!loaded) return (
     <div style={{
       minHeight:"100vh", background:"#fdf6ee",
@@ -343,13 +330,6 @@ export default function App() {
     </div>
   );
 
-  return (
-    <>
-      {isVet
-        ? <VetView state={state} onNext={callNext} onReset={resetQueue} onToggle={toggleOpen} saving={saving} />
-        : <CustomerView state={state} myNumber={myNumber} onTakeNumber={takeNumber} />
-      }
-      <ToggleBtn />
-    </>
-  );
+  if (isVet) return <VetView state={state} onNext={callNext} onReset={resetQueue} onToggle={toggleOpen} saving={saving} />;
+  return <CustomerView state={state} myNumber={myNumber} onTakeNumber={takeNumber} />;
 }
