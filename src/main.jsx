@@ -120,7 +120,7 @@ function vibrate() {
 function QueueCard({ qKey, state, myNumber, onTake }) {
   const q        = QUEUES[qKey];
   const current  = Number(state.current);
-  const mine     = Number(myNumber);
+  const mine     = myNumber ? Number(typeof myNumber === "object" ? myNumber.number : myNumber) : 0;
   const waiting  = mine > 0 ? Math.max(0, mine - current - 1) : null;
   const isMyTurn = mine > 0 && current === mine;
   const isNext   = mine > 0 && waiting === 0 && !isMyTurn;
@@ -349,10 +349,21 @@ export default function App() {
   // poll every 2s
   useEffect(() => {
     async function init() {
-      const [vetS, beautyS, nums] = await Promise.all([
+      const [vetS, beautyS, rawNums] = await Promise.all([
         loadQueue("vet"), loadQueue("beauty"), loadMyNumbers(deviceId.current)
       ]);
-      setStates({ vet: vetS, beauty: beautyS });
+      // clear any numbers taken before the last reset
+      const queues = { vet: vetS, beauty: beautyS };
+      const nums = {};
+      for (const key of Object.keys(QUEUES)) {
+        const entry = rawNums[key];
+        if (!entry) continue;
+        const takenAt  = typeof entry === "object" ? entry.takenAt  : 0;
+        const number   = typeof entry === "object" ? entry.number   : entry;
+        const resetAt  = queues[key].resetAt || 0;
+        if (takenAt > resetAt) nums[key] = { number, takenAt };
+      }
+      setStates(queues);
       setMyNumbers(nums);
       setLoaded(true);
     }
@@ -367,7 +378,7 @@ export default function App() {
   const handleTake = async (key) => {
     const s    = await loadQueue(key);
     const next = { ...s, total: s.total + 1 };
-    const nums = { ...myNumbers, [key]: next.total };
+    const nums = { ...myNumbers, [key]: { number: next.total, takenAt: Date.now() } };
     setStates(prev => ({ ...prev, [key]: next }));
     setMyNumbers(nums);
     await Promise.all([saveQueue(key, next), saveMyNumbers(deviceId.current, nums)]);
@@ -385,22 +396,9 @@ export default function App() {
 
   const handleReset = async (key) => {
     if (!window.confirm(`確定重置「${QUEUES[key].label}」的所有號碼？\n客人的取號記錄也會一併清除。`)) return;
-    const next = { ...defaultState };
+    const next = { ...defaultState, resetAt: Date.now() };
     setStates(prev => ({ ...prev, [key]: next }));
-    // 清掉 queue 狀態
     await saveQueue(key, next);
-    // 清掉所有裝置對這個 queue 的號碼記錄
-    try {
-      const r = await fetch(`${DB_BASE}/devices.json`);
-      const devices = await r.json();
-      if (devices) {
-        await Promise.all(
-          Object.keys(devices).map(deviceId =>
-            fetch(`${DB_BASE}/devices/${deviceId}/${key}.json`, { method: "DELETE" })
-          )
-        );
-      }
-    } catch(e) { console.error(e); }
   };
 
   const handleToggle = async (key) => {
