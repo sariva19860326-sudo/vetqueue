@@ -92,22 +92,44 @@ function BgPaws({ color = "#d4b896" }) {
 }
 
 // ── Alert helpers ────────────────────────────────────────────────────────────
+let sharedCtx = null;
+
+function getAudioCtx() {
+  if (!sharedCtx) {
+    sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (sharedCtx.state === "suspended") sharedCtx.resume();
+  return sharedCtx;
+}
+
+// Call this on user interaction (e.g. 取號按鈕) to unlock audio
+function unlockAudio() {
+  try {
+    const ctx = getAudioCtx();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch(e) {}
+}
+
 function playAlert() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.3, 0.6].forEach(delay => {
+    const ctx = getAudioCtx();
+    [0, 0.35, 0.7].forEach(delay => {
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.frequency.value = 880;
       osc.type = "sine";
-      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4);
+      gain.gain.setValueAtTime(0.5, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.45);
       osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + 0.4);
+      osc.stop(ctx.currentTime + delay + 0.45);
     });
-  } catch(e) { console.log("audio not supported", e); }
+  } catch(e) { console.log("audio error", e); }
 }
 
 function vibrate() {
@@ -194,7 +216,7 @@ function QueueCard({ qKey, state, myNumber, onTake }) {
             目前叫號：{current === 0 ? "—" : String(current).padStart(3,"0")}
             <br />已取號 {state.total} 人
           </div>
-          <button onClick={onTake} disabled={!state.isOpen} style={{
+          <button onClick={() => { unlockAudio(); onTake(); }} disabled={!state.isOpen} style={{
             background: state.isOpen ? "#c07a3a" : "#ccc",
             color:"#fff", border:"none", borderRadius:40,
             padding:"10px 20px", fontSize:14, fontWeight:700,
