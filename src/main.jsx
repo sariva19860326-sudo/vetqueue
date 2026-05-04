@@ -384,10 +384,23 @@ export default function App() {
   };
 
   const handleReset = async (key) => {
-    if (!window.confirm(`確定重置「${QUEUES[key].label}」的所有號碼？`)) return;
+    if (!window.confirm(`確定重置「${QUEUES[key].label}」的所有號碼？\n客人的取號記錄也會一併清除。`)) return;
     const next = { ...defaultState };
     setStates(prev => ({ ...prev, [key]: next }));
+    // 清掉 queue 狀態
     await saveQueue(key, next);
+    // 清掉所有裝置對這個 queue 的號碼記錄
+    try {
+      const r = await fetch(`${DB_BASE}/devices.json`);
+      const devices = await r.json();
+      if (devices) {
+        await Promise.all(
+          Object.keys(devices).map(deviceId =>
+            fetch(`${DB_BASE}/devices/${deviceId}/${key}.json`, { method: "DELETE" })
+          )
+        );
+      }
+    } catch(e) { console.error(e); }
   };
 
   const handleToggle = async (key) => {
