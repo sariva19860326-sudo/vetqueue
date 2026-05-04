@@ -91,6 +91,31 @@ function BgPaws({ color = "#d4b896" }) {
   );
 }
 
+// ── Alert helpers ────────────────────────────────────────────────────────────
+function playAlert() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.3, 0.6].forEach(delay => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.4);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.4);
+    });
+  } catch(e) { console.log("audio not supported", e); }
+}
+
+function vibrate() {
+  try {
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 800]);
+  } catch(e) {}
+}
+
 // ── Queue Card (customer) ─────────────────────────────────────────────────────
 function QueueCard({ qKey, state, myNumber, onTake }) {
   const q        = QUEUES[qKey];
@@ -100,6 +125,16 @@ function QueueCard({ qKey, state, myNumber, onTake }) {
   const isMyTurn = mine > 0 && current === mine;
   const isNext   = mine > 0 && waiting === 0 && !isMyTurn;
   const isDone   = mine > 0 && current > mine;
+  const prevTurn = useRef(false);
+
+  // trigger alert when isMyTurn first becomes true
+  useEffect(() => {
+    if (isMyTurn && !prevTurn.current) {
+      playAlert();
+      vibrate();
+    }
+    prevTurn.current = isMyTurn;
+  }, [isMyTurn]);
 
   const cardBg = isDone ? "#fff"
     : isMyTurn ? "#2e7d32"
