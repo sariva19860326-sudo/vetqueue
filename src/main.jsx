@@ -3,9 +3,20 @@ import { useState, useEffect, useRef } from "react";
 const DB_BASE = "https://cd0509vet-default-rtdb.firebaseio.com";
 
 const QUEUES = {
-  vet:    { key: "vet",    label: "獸醫師義診",         emoji: "🩺", desc: "專業獸醫師現場義診" },
+  vet:    { key: "vet",    label: "獸醫師義診",   emoji: "🩺", desc: "專業獸醫師現場義診" },
   beauty: { key: "beauty", label: "寵物美容體驗", emoji: "✂️", desc: "剪指甲・剃腳底毛" },
 };
+
+const BREAK = { start: 13, startMin: 0, end: 14, endMin: 0 };
+
+function isBreakTime() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const nowMins   = h * 60 + m;
+  const startMins = BREAK.start * 60 + BREAK.startMin;
+  const endMins   = BREAK.end   * 60 + BREAK.endMin;
+  return nowMins >= startMins && nowMins < endMins;
+}
 
 const defaultState = { current: 0, total: 0, isOpen: true };
 
@@ -139,7 +150,7 @@ function vibrate() {
 }
 
 // ── Queue Card (customer) ─────────────────────────────────────────────────────
-function QueueCard({ qKey, state, myNumber, onTake }) {
+function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
   const q        = QUEUES[qKey];
   const current  = Number(state.current);
   const mine     = myNumber ? Number(typeof myNumber === "object" ? myNumber.number : myNumber) : 0;
@@ -194,6 +205,16 @@ function QueueCard({ qKey, state, myNumber, onTake }) {
           <div style={{ fontSize:28, marginBottom:6 }}>🐾</div>
           <div style={{ fontSize:14, fontWeight:700, color:"#5a3a1a" }}>感謝您今天的參與！</div>
           <div style={{ fontSize:12, color:"#a07850", marginTop:4 }}>祝毛孩健康平安 💛</div>
+          {state.isOpen && (
+            <button onClick={() => { unlockAudio(); onRetake(); }} style={{
+              marginTop:12, background:"#c07a3a", color:"#fff",
+              border:"none", borderRadius:40,
+              padding:"10px 20px", fontSize:13, fontWeight:700,
+              cursor:"pointer",
+            }}>
+              🔄 重新取號
+            </button>
+          )}
         </div>
       ) : mine > 0 ? (
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -243,7 +264,7 @@ function QueueCard({ qKey, state, myNumber, onTake }) {
 }
 
 // ── CUSTOMER VIEW ─────────────────────────────────────────────────────────────
-function CustomerView({ states, myNumbers, onTake }) {
+function CustomerView({ states, myNumbers, onTake, onRetake }) {
   return (
     <div style={{
       minHeight:"100vh", background:"#fdf6ee",
@@ -261,6 +282,21 @@ function CustomerView({ states, myNumbers, onTake }) {
         <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>新開店特別活動</p>
       </div>
 
+      {isBreakTime() && (
+        <div style={{
+          width:"100%", maxWidth:360, zIndex:1,
+          background:"#fff3e0", borderRadius:16,
+          border:"2px solid #ffb74d", padding:"16px 20px",
+          textAlign:"center",
+        }}>
+          <div style={{ fontSize:28, marginBottom:6 }}>☕</div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>午休時間</div>
+          <div style={{ fontSize:13, color:"#a07850", marginTop:4 }}>
+            13:00 - 14:00<br />休息結束後恢復服務，請稍候 🐾
+          </div>
+        </div>
+      )}
+
       <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:14, zIndex:1 }}>
         {Object.keys(QUEUES).map(key => (
           <QueueCard
@@ -269,6 +305,7 @@ function CustomerView({ states, myNumbers, onTake }) {
             state={states[key]}
             myNumber={myNumbers[key]}
             onTake={() => onTake(key)}
+            onRetake={() => onRetake(key)}
           />
         ))}
       </div>
@@ -331,6 +368,16 @@ function VetView({ qKey, state, onNext, onReset, onToggle, saving }) {
       >
         {saving ? "更新中…" : "➡ 下一位"}
       </button>
+
+      {isBreakTime() && (
+        <div style={{
+          zIndex:1, background:"#2a1a00", borderRadius:12,
+          padding:"10px 20px", textAlign:"center",
+          border:"1px solid #ffb74d",
+        }}>
+          <span style={{ fontSize:13, color:"#ffb74d" }}>☕ 現在是午休時間 13:00–14:00</span>
+        </div>
+      )}
 
       <div style={{ display:"flex", gap:12, zIndex:1 }}>
         <button onClick={onToggle} style={{
@@ -397,6 +444,15 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  const handleRetake = async (key) => {
+    // clear this key's number then take a new one
+    const nums = { ...myNumbers };
+    delete nums[key];
+    setMyNumbers(nums);
+    await saveMyNumbers(deviceId.current, nums);
+    await handleTake(key);
+  };
+
   const handleTake = async (key) => {
     const s    = await loadQueue(key);
     const next = { ...s, total: s.total + 1 };
@@ -442,5 +498,5 @@ export default function App() {
 
   if (mode === "vet")    return <VetView qKey="vet"    state={states.vet}    onNext={() => handleNext("vet")}    onReset={() => handleReset("vet")}    onToggle={() => handleToggle("vet")}    saving={saving} />;
   if (mode === "beauty") return <VetView qKey="beauty" state={states.beauty} onNext={() => handleNext("beauty")} onReset={() => handleReset("beauty")} onToggle={() => handleToggle("beauty")} saving={saving} />;
-  return <CustomerView states={states} myNumbers={myNumbers} onTake={handleTake} />;
+  return <CustomerView states={states} myNumbers={myNumbers} onTake={handleTake} onRetake={handleRetake} />;
 }
