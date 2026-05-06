@@ -279,7 +279,7 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
         <h1 style={{ margin:"8px 0 0", fontSize:20, color:"#5a3a1a", letterSpacing:2 }}>
           百分百寵物生活館
         </h1>
-        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>新開店特別活動</p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>崇德開幕特別活動</p>
       </div>
 
       {isBreakTime() && (
