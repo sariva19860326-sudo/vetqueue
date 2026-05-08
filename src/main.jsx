@@ -290,7 +290,7 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
           textAlign:"center",
         }}>
           <div style={{ fontSize:28, marginBottom:6 }}>☕</div>
-          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>午休時間</div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>休息時間</div>
           <div style={{ fontSize:13, color:"#a07850", marginTop:4 }}>
             13:00 - 14:00<br />休息結束後恢復服務，請稍候 🐾
           </div>
