@@ -122,7 +122,7 @@ function WaitEstimate({ waiting, mins }) {
   const total = waiting * mins;
   const text  = total === 0 ? "即將輪到您" : total < 60 ? `約 ${total} 分鐘` : `約 ${Math.round(total/60)} 小時`;
   return (
-    <div style={{ fontSize:11, color:"#a07850", marginTop:3 }}>
+    <div style={{ fontSize:14, color:"#1a1817", marginTop:3 }}>
       ⏱ 預估等候 {text}
     </div>
   );
