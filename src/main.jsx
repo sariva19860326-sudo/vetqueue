@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 const DB_BASE = "https://cd0509vet-default-rtdb.firebaseio.com";
 
 const QUEUES = {
-  vet:    { key: "vet",    label: "獸醫師義診",   emoji: "🩺", desc: "專業獸醫師現場義診",    mins: 10 },
+  vet:    { key: "vet",    label: "獸醫師義診",    emoji: "🩺", desc: "專業獸醫師現場義診",    mins: 10 },
   beauty: { key: "beauty", label: "寵物美容體驗", emoji: "✂️", desc: "剪指甲・剃腳底毛",       mins: 10 },
 };
 
@@ -133,6 +133,7 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
   const q       = QUEUES[qKey];
   const current = Number(state.current);
   const mine    = myNumber ? Number(typeof myNumber === "object" ? myNumber.number : myNumber) : 0;
+  // 計算前面還有幾個人 (例如我是 5 號，目前叫 2 號，前面還有 5-2-1 = 2 個人)
   const waiting = mine > 0 ? Math.max(0, mine - current - 1) : null;
   const isMyTurn = mine > 0 && current === mine;
   const isNext   = mine > 0 && waiting === 0 && !isMyTurn;
@@ -179,11 +180,13 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
                 {String(mine).padStart(3,"0")}
               </div>
               {!isMyTurn && (
-  <WaitEstimate 
-    waiting={isNext ? 1 : waiting} 
-    mins={(isNext ? 1 : waiting) * 10} 
-  />
-)}
+                <WaitEstimate 
+                  // 這裡傳入剩餘人數。如果是 isNext，則傳入 1 代表快輪到他了
+                  waiting={isNext ? 1 : waiting + 1} 
+                  // 這裡直接傳入單次服務的基準分鐘數 (10)
+                  mins={q.mins} 
+                />
+              )}
             </div>
             <div style={{ textAlign:"right" }}>
               <div style={{ fontSize:11, color: subColor, marginBottom:2 }}>目前叫號</div>
@@ -220,7 +223,6 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
   }, []);
 
   const onBreak    = isBreakTime();
-  const breakLabel = Object.entries(states).filter(([,s]) => s.isBreak || onBreak).map(([k]) => QUEUES[k].label).join("、");
 
   return (
     <div style={{ minHeight:"100vh", background:"#fdf6ee", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:"32px 20px", fontFamily:"'Noto Serif TC', Georgia, serif", position:"relative", overflow:"hidden" }}>
