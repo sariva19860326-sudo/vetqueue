@@ -225,12 +225,12 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
       <div style={{ textAlign:"center", zIndex:1 }}>
         <Paw size={44} color="#c07a3a" />
         <h1 style={{ margin:"8px 0 0", fontSize:20, color:"#5a3a1a", letterSpacing:2 }}>百分百寵物生活館</h1>
-        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>新開店特別活動</p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>台南崇德店開幕限定活動</p>
       </div>
 
       {/* activity time */}
       <div style={{ zIndex:1, background:"#fff", borderRadius:14, border:"1px solid #f0d9bc", padding:"10px 20px", textAlign:"center" }}>
-        <div style={{ fontSize:11, color:"#a07850", marginBottom:4, letterSpacing:1 }}>活動時間</div>
+        <div style={{ fontSize:11, color:"#a07850", marginBottom:4, letterSpacing:1 }}>獸醫師義診/美容師體驗活動時間</div>
         {ACTIVITY_SESSIONS.map((s,i) => (
           <div key={i} style={{ fontSize:14, fontWeight:700, color:"#c07a3a" }}>{s.start} – {s.end}</div>
         ))}
@@ -240,7 +240,7 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
       {onBreak && (
         <div style={{ width:"100%", maxWidth:360, zIndex:1, background:"#fff3e0", borderRadius:16, border:"2px solid #ffb74d", padding:"16px 20px", textAlign:"center" }}>
           <div style={{ fontSize:28, marginBottom:6 }}>☕</div>
-          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>午休時間</div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>獸醫師與美容師的休息時間</div>
           <div style={{ fontSize:13, color:"#a07850", marginTop:4 }}>
             13:00 – 14:00<br />休息結束後恢復服務，請稍候 🐾
           </div>
