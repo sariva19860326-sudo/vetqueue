@@ -178,7 +178,7 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
               <div style={{ fontSize:48, fontWeight:900, lineHeight:1, color: isMyTurn || isNext ? "#fff" : "#c07a3a" }}>
                 {String(mine).padStart(3,"0")}
               </div>
-              {!isMyTurn && !isNext && <WaitEstimate waiting={waiting} mins={q.mins} />}
+              {!isMyTurn && <WaitEstimate waiting={isNext ? 1 : waiting} mins={q.mins} />}
             </div>
             <div style={{ textAlign:"right" }}>
               <div style={{ fontSize:11, color: subColor, marginBottom:2 }}>目前叫號</div>
