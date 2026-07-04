@@ -232,7 +232,7 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
       <div style={{ textAlign:"center", zIndex:1 }}>
         <Paw size={44} color="#c07a3a" />
         <h1 style={{ margin:"8px 0 0", fontSize:20, color:"#5a3a1a", letterSpacing:2 }}>百分百寵物生活館</h1>
-        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>台南崇德店開幕限定活動</p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>永和中山店開幕限定活動</p>
       </div>
 
       {/* activity time */}
