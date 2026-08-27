@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from "react";
 const DB_BASE = "https://cd0509vet-default-rtdb.firebaseio.com";
 
 const QUEUES = {
-  vet:    { key: "vet",    label: "獸醫師義診",    emoji: "🩺", desc: "專業獸醫師現場義診",    mins: 10 },
-  beauty: { key: "beauty", label: "寵物美容體驗", emoji: "✂️", desc: "剪指甲・剃腳底毛",       mins: 10 },
+  vet:    { key: "vet",    label: "獸醫師義診",   emoji: "🩺", desc: "專業獸醫師現場義診",  mins: 10 },
+  beauty: { key: "beauty", label: "寵物美容體驗", emoji: "✂️", desc: "剪指甲・剃腳底毛",     mins: 10 },
 };
 
 const ACTIVITY_SESSIONS = [
@@ -37,13 +37,6 @@ async function saveQueue(key, s) {
     });
   } catch(e) { console.error(e); }
 }
-
-// ── Device ID ─────────────────────────────────────────────────────────────────
-function getDeviceId() {
-  let id = localStorage.getItem("device-id");
-  if (!id) { id = Math.random().toString(36).slice(2); localStorage.setItem("device-id", id); }
-  return id;
-}
 async function loadMyNumbers(deviceId) {
   try {
     const r = await fetch(`${DB_BASE}/devices/${deviceId}.json`);
@@ -57,6 +50,28 @@ async function saveMyNumbers(deviceId, nums) {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nums),
     });
   } catch(e) { console.error(e); }
+}
+
+// ── Device ID ─────────────────────────────────────────────────────────────────
+// Priority: URL param ?d=xxx > localStorage
+function getDeviceId() {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = params.get("d");
+  if (fromUrl) {
+    localStorage.setItem("device-id", fromUrl);
+    return fromUrl;
+  }
+  let id = localStorage.getItem("device-id");
+  if (!id) {
+    id = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    localStorage.setItem("device-id", id);
+  }
+  return id;
+}
+
+function buildLink(deviceId) {
+  const base = window.location.origin + window.location.pathname;
+  return `${base}?d=${deviceId}`;
 }
 
 // ── Audio / Vibrate ───────────────────────────────────────────────────────────
@@ -116,25 +131,56 @@ function BgPaws({ color="#d4b896" }) {
   ))}</>;
 }
 
+// ── Copy link helper ──────────────────────────────────────────────────────────
+function CopyLinkButton({ deviceId }) {
+  const [copied, setCopied] = useState(false);
+  const link = buildLink(deviceId);
+  const copy = () => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {
+      // fallback for older browsers
+      const el = document.createElement("textarea");
+      el.value = link; document.body.appendChild(el);
+      el.select(); document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+  return (
+    <div style={{ zIndex:1, width:"100%", maxWidth:360, background:"#fff", borderRadius:16, border:"1px solid #f0d9bc", padding:"14px 18px" }}>
+      <div style={{ fontSize:12, color:"#a07850", marginBottom:8 }}>
+        📌 離開頁面後可用此連結找回您的號碼
+      </div>
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <div style={{ flex:1, fontSize:11, color:"#c07a3a", background:"#fdf6ee", borderRadius:8, padding:"6px 10px", wordBreak:"break-all", border:"1px solid #f0d9bc" }}>
+          {link}
+        </div>
+        <button onClick={copy} style={{ background: copied ? "#50a060" : "#c07a3a", color:"#fff", border:"none", borderRadius:10, padding:"8px 14px", fontSize:12, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", transition:"background 0.3s" }}>
+          {copied ? "✓ 已複製" : "複製連結"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Wait time estimate ────────────────────────────────────────────────────────
 function WaitEstimate({ waiting, mins }) {
   if (waiting === null || waiting < 0) return null;
   const total = waiting * mins;
   const text  = total === 0 ? "即將輪到您" : total < 60 ? `約 ${total} 分鐘` : `約 ${Math.round(total/60)} 小時`;
-  return (
-    <div style={{ fontSize:14, color:"#1a1817", marginTop:3 }}>
-      ⏱ 預估等候 {text}
-    </div>
-  );
+  return <div style={{ fontSize:11, color:"#a07850", marginTop:3 }}>⏱ 預估等候 {text}</div>;
 }
 
 // ── Queue Card ────────────────────────────────────────────────────────────────
-function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
+function QueueCard({ qKey, state, myNumber, onTake, onRetake, onSaveName, onEditName }) {
+  const [petNameInput, setPetNameInput] = useState("");
   const q       = QUEUES[qKey];
   const current = Number(state.current);
   const mine    = myNumber ? Number(typeof myNumber === "object" ? myNumber.number : myNumber) : 0;
-  // 計算前面還有幾個人 (例如我是 5 號，目前叫 2 號，前面還有 5-2-1 = 2 個人)
-  const waiting = mine > 0 ? Math.max(0, mine - current - 1) : null;
+  const waiting  = mine > 0 ? Math.max(0, mine - current - 1) : null;
   const isMyTurn = mine > 0 && current === mine;
   const isNext   = mine > 0 && waiting === 0 && !isMyTurn;
   const isDone   = mine > 0 && current > mine;
@@ -147,16 +193,16 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
 
   const cardBg     = isMyTurn ? "#2e7d32" : isNext ? "#e65100" : "#fff";
   const cardBorder = isMyTurn ? "#81c784" : isNext ? "#ffb74d" : "#f0d9bc";
-  const textColor  = (isMyTurn || isNext) && !isDone ? "#fff" : "#5a3a1a";
-  const subColor   = (isMyTurn || isNext) && !isDone ? "#ffffffcc" : "#a07850";
+  const textColor  = (isMyTurn || isNext) ? "#fff" : "#5a3a1a";
+  const subColor   = (isMyTurn || isNext) ? "#ffffffcc" : "#a07850";
 
   return (
     <div style={{ background: isDone ? "#fff" : cardBg, borderRadius:20, border:`2px solid ${isDone ? "#f0d9bc" : cardBorder}`, boxShadow:"0 4px 20px rgba(192,122,58,0.12)", padding:"20px 24px", zIndex:1, transition:"background 0.4s" }}>
       <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
         <span style={{ fontSize:22 }}>{q.emoji}</span>
         <div>
-          <div style={{ fontSize:15, fontWeight:700, color: textColor }}>{q.label}</div>
-          <div style={{ fontSize:11, color: subColor }}>{q.desc}</div>
+          <div style={{ fontSize:15, fontWeight:700, color: isDone ? "#5a3a1a" : textColor }}>{q.label}</div>
+          <div style={{ fontSize:11, color: isDone ? "#a07850" : subColor }}>{q.desc}</div>
         </div>
       </div>
 
@@ -179,14 +225,7 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
               <div style={{ fontSize:48, fontWeight:900, lineHeight:1, color: isMyTurn || isNext ? "#fff" : "#c07a3a" }}>
                 {String(mine).padStart(3,"0")}
               </div>
-              {!isMyTurn && (
-                <WaitEstimate 
-                  // 這裡傳入剩餘人數。如果是 isNext，則傳入 1 代表快輪到他了
-                  waiting={isNext ? 1 : waiting + 1} 
-                  // 這裡直接傳入單次服務的基準分鐘數 (10)
-                  mins={q.mins} 
-                />
-              )}
+              {!isMyTurn && <WaitEstimate waiting={isNext ? 1 : waiting} mins={q.mins} />}
             </div>
             <div style={{ textAlign:"right" }}>
               <div style={{ fontSize:11, color: subColor, marginBottom:2 }}>目前叫號</div>
@@ -195,19 +234,58 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
               </div>
             </div>
           </div>
+          {/* pet name input */}
+          <div style={{ marginTop:10 }}>
+            {myNumber?.petName ? (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background: isMyTurn || isNext ? "rgba(255,255,255,0.15)" : "#fdf6ee", borderRadius:10, padding:"8px 12px" }}>
+                <span style={{ fontSize:13, color: isMyTurn || isNext ? "#fff" : "#7a5030" }}>🐾 {myNumber.petName}</span>
+                <button onClick={onEditName} style={{ fontSize:11, color: isMyTurn || isNext ? "#ffffffaa" : "#a07850", background:"transparent", border:"none", cursor:"pointer" }}>修改</button>
+              </div>
+            ) : (
+              <div style={{ display:"flex", gap:6 }}>
+                <input
+                  placeholder="請輸入寵物名字"
+                  value={petNameInput}
+                  onChange={e => setPetNameInput(e.target.value)}
+                  style={{ flex:1, borderRadius:10, border:`1px solid ${isMyTurn || isNext ? "rgba(255,255,255,0.4)" : "#f0d9bc"}`, padding:"8px 12px", fontSize:13, background: isMyTurn || isNext ? "rgba(255,255,255,0.15)" : "#fff", color: isMyTurn || isNext ? "#fff" : "#5a3a1a", outline:"none" }}
+                />
+                <button onClick={() => { if(petNameInput.trim()) onSaveName(petNameInput.trim()); }} style={{ background:"#c07a3a", color:"#fff", border:"none", borderRadius:10, padding:"8px 14px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                  儲存
+                </button>
+              </div>
+            )}
+          </div>
           <div style={{ marginTop:10, fontSize:13, fontWeight:600, textAlign:"center", color: isMyTurn || isNext ? "#fff" : "#7a5030" }}>
             {isMyTurn ? "🎉 輪到您了，請進！" : isNext ? "⚡ 下一位就是您，請準備！" : `前面還有 ${waiting} 位`}
           </div>
         </>
       ) : (
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ fontSize:12, color:"#a07850" }}>
-            目前叫號：{current === 0 ? "—" : String(current).padStart(3,"0")}<br />
-            已取號 {state.total} 人
+        <div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+            <div style={{ fontSize:12, color:"#a07850" }}>
+              目前叫號：{current === 0 ? "—" : String(current).padStart(3,"0")}<br />
+              已取號 {state.total} 人
+            </div>
           </div>
-          <button onClick={() => { unlockAudio(); onTake(); }} disabled={!state.isOpen} style={{ background: state.isOpen ? "#c07a3a" : "#ccc", color:"#fff", border:"none", borderRadius:40, padding:"10px 20px", fontSize:14, fontWeight:700, cursor: state.isOpen ? "pointer" : "default" }}>
-            {state.isOpen ? "🐾 取號" : "已暫停"}
-          </button>
+          {state.isOpen ? (
+            <div>
+              <input
+                placeholder="請先輸入寵物名字"
+                value={petNameInput}
+                onChange={e => setPetNameInput(e.target.value)}
+                style={{ width:"100%", boxSizing:"border-box", borderRadius:10, border:"1px solid #f0d9bc", padding:"10px 12px", fontSize:14, color:"#5a3a1a", outline:"none", marginBottom:8 }}
+              />
+              <button
+                onClick={() => { if(petNameInput.trim()) { unlockAudio(); onTake(petNameInput.trim()); } }}
+                disabled={!petNameInput.trim()}
+                style={{ width:"100%", background: petNameInput.trim() ? "#c07a3a" : "#e0c9b0", color:"#fff", border:"none", borderRadius:40, padding:"12px", fontSize:15, fontWeight:700, cursor: petNameInput.trim() ? "pointer" : "default" }}
+              >
+                🐾 取號
+              </button>
+            </div>
+          ) : (
+            <div style={{ textAlign:"center", fontSize:13, color:"#a07850" }}>目前暫停取號</div>
+          )}
         </div>
       )}
     </div>
@@ -215,29 +293,29 @@ function QueueCard({ qKey, state, myNumber, onTake, onRetake }) {
 }
 
 // ── CUSTOMER VIEW ─────────────────────────────────────────────────────────────
-function CustomerView({ states, myNumbers, onTake, onRetake }) {
+function CustomerView({ states, myNumbers, onTake, onRetake, onSaveName, onEditName, deviceId }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => tick(n => n+1), 30000);
     return () => clearInterval(id);
   }, []);
 
-  const onBreak    = isBreakTime();
+  const onBreak   = isBreakTime();
+  const hasTaken  = Object.keys(myNumbers).length > 0;
 
   return (
-    <div style={{ minHeight:"100vh", background:"#fdf6ee", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:"32px 20px", fontFamily:"'Noto Serif TC', Georgia, serif", position:"relative", overflow:"hidden" }}>
+    <div style={{ minHeight:"100vh", background:"#fdf6ee", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, padding:"32px 20px", fontFamily:"'Noto Serif TC', Georgia, serif", position:"relative", overflow:"hidden" }}>
       <BgPaws />
 
-      {/* header */}
       <div style={{ textAlign:"center", zIndex:1 }}>
         <Paw size={44} color="#c07a3a" />
         <h1 style={{ margin:"8px 0 0", fontSize:20, color:"#5a3a1a", letterSpacing:2 }}>百分百寵物生活館</h1>
-        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>永和中山店開幕限定活動</p>
+        <p style={{ margin:"4px 0 0", fontSize:12, color:"#a07850" }}>新開店特別活動</p>
       </div>
 
       {/* activity time */}
       <div style={{ zIndex:1, background:"#fff", borderRadius:14, border:"1px solid #f0d9bc", padding:"10px 20px", textAlign:"center" }}>
-        <div style={{ fontSize:11, color:"#a07850", marginBottom:4, letterSpacing:1 }}>獸醫師義診/美容師體驗活動時間</div>
+        <div style={{ fontSize:11, color:"#a07850", marginBottom:4, letterSpacing:1 }}>活動時間</div>
         {ACTIVITY_SESSIONS.map((s,i) => (
           <div key={i} style={{ fontSize:14, fontWeight:700, color:"#c07a3a" }}>{s.start} – {s.end}</div>
         ))}
@@ -247,19 +325,20 @@ function CustomerView({ states, myNumbers, onTake, onRetake }) {
       {onBreak && (
         <div style={{ width:"100%", maxWidth:360, zIndex:1, background:"#fff3e0", borderRadius:16, border:"2px solid #ffb74d", padding:"16px 20px", textAlign:"center" }}>
           <div style={{ fontSize:28, marginBottom:6 }}>☕</div>
-          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>獸醫師與美容師的休息時間</div>
-          <div style={{ fontSize:13, color:"#a07850", marginTop:4 }}>
-            13:00 – 14:00<br />休息結束後恢復服務，請稍候 🐾
-          </div>
+          <div style={{ fontSize:16, fontWeight:700, color:"#5a3a1a" }}>午休時間</div>
+          <div style={{ fontSize:13, color:"#a07850", marginTop:4 }}>13:00 – 14:00<br />休息結束後恢復服務，請稍候 🐾</div>
         </div>
       )}
 
       {/* queue cards */}
       <div style={{ width:"100%", maxWidth:360, display:"flex", flexDirection:"column", gap:14, zIndex:1 }}>
         {Object.keys(QUEUES).map(key => (
-          <QueueCard key={key} qKey={key} state={states[key]} myNumber={myNumbers[key]} onTake={() => onTake(key)} onRetake={() => onRetake(key)} />
+          <QueueCard key={key} qKey={key} state={states[key]} myNumber={myNumbers[key]} onTake={(name) => onTake(key, name)} onRetake={() => onRetake(key)} onSaveName={(name) => onSaveName(key, name)} onEditName={() => onEditName(key)} />
         ))}
       </div>
+
+      {/* copy link - only show after taking a number */}
+      {hasTaken && <CopyLinkButton deviceId={deviceId} />}
 
       <p style={{ fontSize:11, color:"#c0a080", zIndex:1, textAlign:"center" }}>請留意號碼變化，輪到您時請前往對應區域</p>
     </div>
@@ -273,7 +352,6 @@ function VetView({ qKey, state, onNext, onReset, onToggle, saving }) {
   return (
     <div style={{ minHeight:"100vh", background:"#1a1008", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:24, padding:"32px 20px", fontFamily:"'Noto Serif TC', Georgia, serif", position:"relative", overflow:"hidden" }}>
       <BgPaws color="#c07a3a" />
-
       <div style={{ textAlign:"center", zIndex:1 }}>
         <span style={{ fontSize:40 }}>{q.emoji}</span>
         <h1 style={{ margin:"8px 0 0", fontSize:20, color:"#f0d9bc", letterSpacing:2 }}>{q.label}</h1>
@@ -282,7 +360,7 @@ function VetView({ qKey, state, onNext, onReset, onToggle, saving }) {
 
       {onBreak && (
         <div style={{ zIndex:1, background:"#2a1a00", borderRadius:12, padding:"10px 20px", textAlign:"center", border:"1px solid #ffb74d" }}>
-          <span style={{ fontSize:13, color:"#ffb74d" }}>☕ 獸醫師與美容師的休息時間 13:00–14:00</span>
+          <span style={{ fontSize:13, color:"#ffb74d" }}>☕ 午休時間 13:00–14:00</span>
         </div>
       )}
 
@@ -299,7 +377,15 @@ function VetView({ qKey, state, onNext, onReset, onToggle, saving }) {
         ))}
       </div>
 
-      <button onClick={onNext} disabled={saving} style={{ background: saving ? "#3a2510" : "#c07a3a", color: saving ? "#6a4a20" : "#fff", border:"none", borderRadius:60, padding:"22px 60px", fontSize:22, fontWeight:900, cursor: saving ? "default" : "pointer", letterSpacing:1, zIndex:1, boxShadow:"0 6px 28px rgba(192,122,58,0.4)", transition:"transform 0.1s, background 0.2s" }}
+      {/* current pet name */}
+      <div style={{ zIndex:1, background:"#2a1a08", borderRadius:16, padding:"14px 24px", textAlign:"center", border:"1px solid #4a2e10", minWidth:200 }}>
+        <div style={{ fontSize:11, color:"#a07850", marginBottom:4 }}>目前看診寵物</div>
+        <div style={{ fontSize:22, fontWeight:700, color:"#f0d9bc" }}>
+          {state.currentPetName ? `🐾 ${state.currentPetName}` : "—"}
+        </div>
+      </div>
+
+      <button onClick={onNext} disabled={saving} style={{ background: saving ? "#3a2510" : "#c07a3a", color: saving ? "#6a4a20" : "#fff", border:"none", borderRadius:60, padding:"22px 60px", fontSize:22, fontWeight:900, cursor: saving ? "default" : "pointer", letterSpacing:1, zIndex:1, boxShadow:"0 6px 28px rgba(192,122,58,0.4)" }}
         onMouseDown={e => { if(!saving) e.currentTarget.style.transform="scale(0.95)" }}
         onMouseUp={e => e.currentTarget.style.transform="scale(1)"}
       >
@@ -333,7 +419,9 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
-      const [vetS, beautyS, rawNums] = await Promise.all([loadQueue("vet"), loadQueue("beauty"), loadMyNumbers(deviceId.current)]);
+      const [vetS, beautyS, rawNums] = await Promise.all([
+        loadQueue("vet"), loadQueue("beauty"), loadMyNumbers(deviceId.current)
+      ]);
       const queues = { vet: vetS, beauty: beautyS };
       const nums   = {};
       for (const key of Object.keys(QUEUES)) {
@@ -356,13 +444,25 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const handleTake = async (key) => {
+  const handleTake = async (key, petName = "") => {
     const s    = await loadQueue(key);
     const next = { ...s, total: s.total + 1 };
-    const nums = { ...myNumbers, [key]: { number: next.total, takenAt: Date.now() } };
+    const nums = { ...myNumbers, [key]: { number: next.total, takenAt: Date.now(), petName } };
     setStates(prev => ({ ...prev, [key]: next }));
     setMyNumbers(nums);
     await Promise.all([saveQueue(key, next), saveMyNumbers(deviceId.current, nums)]);
+  };
+
+  const handleSaveName = async (key, name) => {
+    const nums = { ...myNumbers, [key]: { ...myNumbers[key], petName: name } };
+    setMyNumbers(nums);
+    await saveMyNumbers(deviceId.current, nums);
+  };
+
+  const handleEditName = (key) => {
+    const nums = { ...myNumbers, [key]: { ...myNumbers[key], petName: "" } };
+    setMyNumbers(nums);
+    saveMyNumbers(deviceId.current, nums);
   };
 
   const handleRetake = async (key) => {
@@ -377,7 +477,22 @@ export default function App() {
     setSaving(true);
     const s        = await loadQueue(key);
     const newTotal = Math.max(s.total, s.current + 1);
-    const next     = { ...s, total: newTotal, current: s.current + 1 };
+    const nextNum  = s.current + 1;
+    // find pet name for the next number from all devices
+    let petName = "";
+    try {
+      const r = await fetch(`${DB_BASE}/devices.json`);
+      const devices = await r.json();
+      if (devices) {
+        for (const dev of Object.values(devices)) {
+          const entry = dev[key];
+          if (!entry) continue;
+          const num = typeof entry === "object" ? entry.number : entry;
+          if (Number(num) === nextNum && entry.petName) { petName = entry.petName; break; }
+        }
+      }
+    } catch(e) {}
+    const next = { ...s, total: newTotal, current: nextNum, currentPetName: petName };
     setStates(prev => ({ ...prev, [key]: next }));
     await saveQueue(key, next);
     setSaving(false);
@@ -405,5 +520,5 @@ export default function App() {
 
   if (mode === "vet")    return <VetView qKey="vet"    state={states.vet}    onNext={() => handleNext("vet")}    onReset={() => handleReset("vet")}    onToggle={() => handleToggle("vet")}    saving={saving} />;
   if (mode === "beauty") return <VetView qKey="beauty" state={states.beauty} onNext={() => handleNext("beauty")} onReset={() => handleReset("beauty")} onToggle={() => handleToggle("beauty")} saving={saving} />;
-  return <CustomerView states={states} myNumbers={myNumbers} onTake={handleTake} onRetake={handleRetake} />;
+  return <CustomerView states={states} myNumbers={myNumbers} onTake={handleTake} onRetake={handleRetake} onSaveName={handleSaveName} onEditName={handleEditName} deviceId={deviceId.current} />;
 }
