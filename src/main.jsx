@@ -535,15 +535,7 @@ export default function App() {
     setStates(prev => ({ ...prev, [key]: next }));
     await saveQueue(key, next);
     try {
-      const r = await fetch(`${DB_BASE}/devices.json`);
-      const devices = await r.json();
-      if (devices) {
-        await Promise.all(
-          Object.keys(devices).map(did =>
-            fetch(`${DB_BASE}/devices/${did}/${key}.json`, { method: "DELETE" })
-          )
-        );
-      }
+      await fetch(`${DB_BASE}/devices.json`, { method: "DELETE" });
     } catch(e) { console.error(e); }
   };
 
