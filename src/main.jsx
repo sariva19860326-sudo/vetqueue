@@ -22,6 +22,27 @@ function isBreakTime() {
 
 const defaultState = { current: 0, total: 0, isOpen: true };
 
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+async function checkNewDay(key, onConfirmReset) {
+  try {
+    const r = await fetch(`${DB_BASE}/${key}.json`);
+    const d = await r.json();
+    if (!d || d.total === 0) return; // 沒有資料不需要提醒
+    const lastDate = d.resetDate || "";
+    const today    = todayStr();
+    if (lastDate === today) return; // 同一天不提醒
+    // 新的一天，跳出提醒
+    const q = key === "vet" ? "獸醫師義診" : "寵物美容體驗";
+    if (window.confirm(`偵測到今天是新的活動日！\n「${q}」的號碼尚未重置，是否要重置號碼？\n（建議每天活動開始前重置）`)) {
+      onConfirmReset();
+    }
+  } catch(e) { console.error(e); }
+}
+
 // ── Firebase ──────────────────────────────────────────────────────────────────
 async function loadQueue(key) {
   try {
@@ -349,6 +370,10 @@ function CustomerView({ states, myNumbers, onTake, onRetake, onSaveName, onEditN
 function VetView({ qKey, state, onNext, onReset, onToggle, saving }) {
   const q = QUEUES[qKey];
   const onBreak = isBreakTime();
+
+  useEffect(() => {
+    checkNewDay(qKey, onReset);
+  }, []);
   return (
     <div style={{ minHeight:"100vh", background:"#1a1008", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:24, padding:"32px 20px", fontFamily:"'Noto Serif TC', Georgia, serif", position:"relative", overflow:"hidden" }}>
       <BgPaws color="#c07a3a" />
@@ -479,16 +504,22 @@ export default function App() {
     const newTotal = Math.max(s.total, s.current + 1);
     const nextNum  = s.current + 1;
     // find pet name for the next number from all devices
+    // must be taken AFTER the last reset to avoid stale data from previous days
     let petName = "";
     try {
+      const resetAt = s.resetAt || 0;
       const r = await fetch(`${DB_BASE}/devices.json`);
       const devices = await r.json();
       if (devices) {
         for (const dev of Object.values(devices)) {
           const entry = dev[key];
-          if (!entry) continue;
-          const num = typeof entry === "object" ? entry.number : entry;
-          if (Number(num) === nextNum && entry.petName) { petName = entry.petName; break; }
+          if (!entry || typeof entry !== "object") continue;
+          const num     = Number(entry.number);
+          const takenAt = entry.takenAt || 0;
+          if (num === nextNum && entry.petName && takenAt > resetAt) {
+            petName = entry.petName;
+            break;
+          }
         }
       }
     } catch(e) {}
@@ -500,9 +531,20 @@ export default function App() {
 
   const handleReset = async (key) => {
     if (!window.confirm(`確定重置「${QUEUES[key].label}」的所有號碼？\n客人的取號記錄也會一併清除。`)) return;
-    const next = { ...defaultState, resetAt: Date.now() };
+    const next = { ...defaultState, resetAt: Date.now(), resetDate: todayStr() };
     setStates(prev => ({ ...prev, [key]: next }));
     await saveQueue(key, next);
+    try {
+      const r = await fetch(`${DB_BASE}/devices.json`);
+      const devices = await r.json();
+      if (devices) {
+        await Promise.all(
+          Object.keys(devices).map(did =>
+            fetch(`${DB_BASE}/devices/${did}/${key}.json`, { method: "DELETE" })
+          )
+        );
+      }
+    } catch(e) { console.error(e); }
   };
 
   const handleToggle = async (key) => {
